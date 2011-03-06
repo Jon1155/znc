@@ -537,35 +537,55 @@ bool CZNC::WriteConfig() {
 	m_LockFile.Write("MaxBufferSize= " + CString(m_uiMaxBufferSize) + "\n");
 	m_LockFile.Write("SSLCertFile  = " + CString(m_sSSLCertFile) + "\n");
 
+	m_LockFile.Write("\n");
 	for (size_t l = 0; l < m_vpListeners.size(); l++) {
 		CListener* pListener = m_vpListeners[l];
-		CString sHostPortion = pListener->GetBindHost();
 
-		if (!sHostPortion.empty()) {
-			sHostPortion = sHostPortion.FirstLine() + " ";
+		m_LockFile.Write("<Listener>\n");
+
+		if (!pListener->GetBindHost().empty()) {
+			m_LockFile.Write("\tHost = " + pListener->GetBindHost() + "\n");
 		}
+		m_LockFile.Write("\tPort = " + CString(pListener->GetPort()) + "\n");
 
-		CString sAcceptProtocol;
-		if(pListener->GetAcceptType() == CListener::ACCEPT_IRC)
-			sAcceptProtocol = "irc_only ";
-		else if(pListener->GetAcceptType() == CListener::ACCEPT_HTTP)
-			sAcceptProtocol = "web_only ";
-
-		CString s6;
+		bool b4, b6;
 		switch (pListener->GetAddrType()) {
 			case ADDR_IPV4ONLY:
-				s6 = "4";
+				b4 = true;
+				b6 = false;
 				break;
 			case ADDR_IPV6ONLY:
-				s6 = "6";
+				b4 = false;
+				b6 = true;
 				break;
 			case ADDR_ALL:
-				s6 = " ";
+				b4 = true;
+				b6 = true;
 				break;
 		}
+		m_LockFile.Write("\tIPv4 = " + CString(b4) + "\n");
+		m_LockFile.Write("\tIPv6 = " + CString(b6) + "\n");
+		m_LockFile.Write("\tSSL = " + CString(pListener->IsSSL()) + "\n");
 
-		m_LockFile.Write("Listener" + s6 + "    = " + sAcceptProtocol + sHostPortion +
-			CString((pListener->IsSSL()) ? "+" : "") + CString(pListener->GetPort()) + "\n");
+		bool bIRC, bWeb;
+		switch (pListener->GetAcceptType()) {
+			case CListener::ACCEPT_IRC:
+				bIRC = true;
+				bWeb = false;
+				break;
+			case CListener::ACCEPT_HTTP:
+				bIRC = false;
+				bWeb = true;
+				break;
+			case CListener::ACCEPT_ALL:
+				bIRC = true;
+				bWeb = true;
+				break;
+		}
+		m_LockFile.Write("\tAllowIRC = " + CString(bIRC) + "\n");
+		m_LockFile.Write("\tAllowWeb = " + CString(bWeb) + "\n");
+
+		m_LockFile.Write("</Listener>\n\n");
 	}
 
 	m_LockFile.Write("ConnectDelay = " + CString(m_uiConnectDelay) + "\n");
@@ -1109,11 +1129,32 @@ bool CZNC::DoRehash(CString& sError)
 		m_vpListeners.erase(m_vpListeners.begin());
 	}
 
+	struct CListenerInfo {
+		bool bSSL;
+		bool bAllowWeb;
+		bool bAllowIRC;
+		unsigned short uPort;
+		CString sBindHost;
+		bool bIPv4;
+		bool bIPv6;
+
+		CListenerInfo() {
+			bSSL = false;
+			bAllowIRC = true;
+			bAllowWeb = true;
+			uPort = 0;
+			sBindHost = "";
+			bIPv4 = true;
+			bIPv6 = true;
+		}
+	};
+
 	CString sLine;
 	bool bCommented = false;     // support for /**/ style comments
 	CUser* pUser = NULL;         // Used to keep track of which user block we are in
 	CUser* pRealUser = NULL;     // If we rehash a user, this is the real one
 	CChan* pChan = NULL;         // Used to keep track of which chan block we are in
+	CListenerInfo* pListenerInfo = NULL; // Used to keep track of which listener block we are in
 	unsigned int uLineNum = 0;
 	MCString msModules;          // Modules are queued for later loading
 
@@ -1205,10 +1246,132 @@ bool CZNC::DoRehash(CString& sError)
 						pRealUser = NULL;
 						continue;
 					}
+				} else if (pListenerInfo) {
+					EAddrType eAddr = ADDR_ALL;
+					if (pListenerInfo->bIPv4) {
+						if (pListenerInfo->bIPv6) {
+							eAddr = ADDR_ALL;
+						} else {
+							eAddr = ADDR_IPV4ONLY;
+						}
+					} else {
+						if (pListenerInfo->bIPv6) {
+							eAddr = ADDR_IPV6ONLY;
+						} else {
+							sError = "Listener can't listen: neither IPv4 nor IPv6 are enabled.";
+							CUtils::PrintStatus(false, sError);
+							return false;
+						}
+					}
+
+					CListener::EAcceptType eAccept = CListener::ACCEPT_ALL;
+					if (pListenerInfo->bAllowIRC) {
+						if (pListenerInfo->bAllowWeb) {
+							eAccept = CListener::ACCEPT_ALL;
+						} else {
+							eAccept = CListener::ACCEPT_IRC;
+						}
+					} else {
+						if (pListenerInfo->bAllowWeb) {
+							eAccept = CListener::ACCEPT_HTTP;
+						} else {
+							sError = "Listener doesn't have meaning in its life: neither IRC nor HTTP are allowed.";
+							CUtils::PrintStatus(false, sError);
+							return false;
+						}
+					}
+
+					CString sHostComment;
+
+					if (!pListenerInfo->sBindHost.empty()) {
+						sHostComment = " on host [" + pListenerInfo->sBindHost + "]";
+					}
+
+					CString sIPV6Comment;
+
+					switch (eAddr) {
+						case ADDR_ALL:
+							sIPV6Comment = "";
+							break;
+						case ADDR_IPV4ONLY:
+							sIPV6Comment = " using ipv4";
+							break;
+						case ADDR_IPV6ONLY:
+							sIPV6Comment = " using ipv6";
+					}
+
+					CUtils::PrintAction("Binding to port [" + CString((pListenerInfo->bSSL) ? "+" : "")
+							+ CString(pListenerInfo->uPort) + "]" + sHostComment + sIPV6Comment);
+
+#ifndef HAVE_IPV6
+					if (ADDR_IPV6ONLY == eAddr) {
+						sError = "IPV6 is not enabled";
+						CUtils::PrintStatus(false, sError);
+						return false;
+					}
+#endif
+
+#ifndef HAVE_LIBSSL
+					if (pListenerInfo->bSSL) {
+						sError = "SSL is not enabled";
+						CUtils::PrintStatus(false, sError);
+						return false;
+					}
+#else
+					CString sPemFile = GetPemLocation();
+
+					if (pListenerInfo->bSSL && !CFile::Exists(sPemFile)) {
+						sError = "Unable to locate pem file: [" + sPemFile + "]";
+						CUtils::PrintStatus(false, sError);
+
+						// If stdin is e.g. /dev/null and we call GetBoolInput(),
+						// we are stuck in an endless loop!
+						if (isatty(0) && CUtils::GetBoolInput("Would you like to create a new pem file?", true)) {
+							sError.clear();
+							WritePemFile();
+						} else {
+							return false;
+						}
+
+						CUtils::PrintAction("Binding to port [+" + CString(pListenerInfo->uPort) + "]" + sHostComment + sIPV6Comment);
+					}
+#endif
+					if (!pListenerInfo->uPort) {
+						sError = "Invalid port";
+						CUtils::PrintStatus(false, sError);
+						return false;
+					}
+
+					CListener* pListener = new CListener(
+							pListenerInfo->uPort,
+							pListenerInfo->sBindHost,
+							pListenerInfo->bSSL,
+							eAddr, eAccept);
+
+					if (!pListener->Listen()) {
+						sError = FormatBindError();
+						CUtils::PrintStatus(false, sError);
+						delete pListener;
+						return false;
+					}
+
+					m_vpListeners.push_back(pListener);
+					CUtils::PrintStatus(true);
+
+					delete pListenerInfo;
+					pListenerInfo = NULL;
+
+					continue;
 				}
 			} else if (sTag.Equals("User")) {
 				if (pUser) {
 					sError = "You may not nest <User> tags inside of other <User> tags.";
+					CUtils::PrintError(sError);
+					return false;
+				}
+
+				if (pListenerInfo) {
+					sError = "You may not nest <User> tags inside of <Listener> tags.";
 					CUtils::PrintError(sError);
 					return false;
 				}
@@ -1261,6 +1424,22 @@ bool CZNC::DoRehash(CString& sError)
 				}
 
 				pChan = new CChan(sValue, pUser, true);
+				continue;
+			} else if (sTag.Equals("Listener")) {
+
+				if (pUser) {
+					sError = "You may not nest <Listener> tags inside of <User>.";
+					CUtils::PrintError(sError);
+					return false;
+				}
+
+				if (pListenerInfo) {
+					sError = "You may not nest <Listener> tags inside of other <Listener> tags.";
+					CUtils::PrintError(sError);
+					return false;
+				}
+
+				pListenerInfo = new CListenerInfo();
 				continue;
 			}
 		}
@@ -1484,7 +1663,31 @@ bool CZNC::DoRehash(CString& sError)
 						continue;
 					}
 				}
+			} else if (pListenerInfo) {
+				if (sName.Equals("SSL")) {
+					pListenerInfo->bSSL = sValue.ToBool();
+					continue;
+				} else if (sName.Equals("AllowWeb")) {
+					pListenerInfo->bAllowWeb = sValue.ToBool();
+					continue;
+				} else if (sName.Equals("AllowIRC")) {
+					pListenerInfo->bAllowIRC = sValue.ToBool();
+					continue;
+				} else if (sName.Equals("IPv4")) {
+					pListenerInfo->bIPv4 = sValue.ToBool();
+					continue;
+				} else if (sName.Equals("IPv6")) {
+					pListenerInfo->bIPv6 = sValue.ToBool();
+					continue;
+				} else if (sName.Equals("Port")) {
+					pListenerInfo->uPort = sValue.ToUShort();
+					continue;
+				} else if (sName.Equals("Host")) {
+					pListenerInfo->sBindHost = sValue;
+					continue;
+				}
 			} else {
+				// Legacy listeners for back compatibility
 				if (sName.Equals("Listen") || sName.Equals("Listen6") || sName.Equals("Listen4")
 						|| sName.Equals("Listener") || sName.Equals("Listener6") || sName.Equals("Listener4")) {
 					EAddrType eAddr = ADDR_ALL;

@@ -24,13 +24,14 @@ public:
 		ACCEPT_ALL
 	} EAcceptType;
 
-	CListener(unsigned short uPort, const CString& sBindHost, bool bSSL, EAddrType eAddr, EAcceptType eAccept) {
+	CListener(unsigned short uPort, const CString& sBindHost, bool bSSL, EAddrType eAddr, EAcceptType eAccept, const CString& sSSLCertFile = "") {
 		m_uPort = uPort;
 		m_sBindHost = sBindHost;
 		m_bSSL = bSSL;
 		m_eAddr = eAddr;
 		m_pListener = NULL;
 		m_eAcceptType = eAccept;
+		m_sSSLCertFile = sSSLCertFile.empty() ? CZNC::Get().GetPemLocation() : sSSLCertFile;
 	}
 
 	~CListener();
@@ -42,6 +43,7 @@ public:
 	const CString& GetBindHost() const { return m_sBindHost; }
 	CRealListener* GetRealListener() const { return m_pListener; }
 	EAcceptType GetAcceptType() const { return m_eAcceptType; }
+	CString GetSSLCertFile() const { return CDir::ChangeDir("", m_sSSLCertFile); }
 	// !Getters
 
 	// It doesn't make sense to change any of the settings after Listen()
@@ -59,6 +61,7 @@ protected:
 	CString         m_sBindHost;
 	CRealListener*  m_pListener;
 	EAcceptType     m_eAcceptType;
+	CString         m_sSSLCertFile;
 };
 
 class CRealListener : public CZNCSock {

@@ -24,7 +24,7 @@ bool CListener::Listen() {
 #ifdef HAVE_LIBSSL
 	if (IsSSL()) {
 		bSSL = true;
-		m_pListener->SetPemLocation(CZNC::Get().GetPemLocation());
+		m_pListener->SetPemLocation(GetSSLCertFile());
 	}
 #endif
 

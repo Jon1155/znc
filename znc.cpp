@@ -566,6 +566,7 @@ bool CZNC::WriteConfig() {
 		m_LockFile.Write("\tIPv4 = " + CString(b4) + "\n");
 		m_LockFile.Write("\tIPv6 = " + CString(b6) + "\n");
 		m_LockFile.Write("\tSSL = " + CString(pListener->IsSSL()) + "\n");
+		m_LockFile.Write("\tSSLCertFile = " + pListener->GetSSLCertFile() + "\n");
 
 		bool bIRC, bWeb;
 		switch (pListener->GetAcceptType()) {
@@ -1137,6 +1138,7 @@ bool CZNC::DoRehash(CString& sError)
 		CString sBindHost;
 		bool bIPv4;
 		bool bIPv6;
+		CString sSSLCertFile;
 
 		CListenerInfo() {
 			bSSL = false;
@@ -1146,6 +1148,7 @@ bool CZNC::DoRehash(CString& sError)
 			sBindHost = "";
 			bIPv4 = true;
 			bIPv6 = true;
+			sSSLCertFile = CZNC::Get().GetPemLocation();
 		}
 	};
 
@@ -1346,7 +1349,8 @@ bool CZNC::DoRehash(CString& sError)
 							pListenerInfo->uPort,
 							pListenerInfo->sBindHost,
 							pListenerInfo->bSSL,
-							eAddr, eAccept);
+							eAddr, eAccept,
+							pListenerInfo->sSSLCertFile);
 
 					if (!pListener->Listen()) {
 						sError = FormatBindError();
@@ -1684,6 +1688,9 @@ bool CZNC::DoRehash(CString& sError)
 					continue;
 				} else if (sName.Equals("Host")) {
 					pListenerInfo->sBindHost = sValue;
+					continue;
+				} else if (sName.Equals("SSLCertFile")) {
+					pListenerInfo->sSSLCertFile = sValue;
 					continue;
 				}
 			} else {

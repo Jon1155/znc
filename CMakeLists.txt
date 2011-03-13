@@ -22,9 +22,6 @@ option ( ENABLE_EXTRA "Enable some extra modules" )
 include ( CheckSymbolExists )
 
 check_symbol_exists ( lstat sys/stat.h HAVE_LSTAT )
-if ( NOT HAVE_LSTAT )
-	message ( FATAL_ERROR "Missing lstat() function." )
-endif ()
 
 check_symbol_exists ( getopt_long getopt.h HAVE_GETOPT_LONG )
 if ( NOT HAVE_GETOPT_LONG )

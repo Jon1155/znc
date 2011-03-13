@@ -7,13 +7,15 @@ project ( ZNC )
 
 find_package ( PkgConfig )
 
+set ( ZNC_COMPILE_FLAGS "" )
+set ( ZNC_LINK_FLAGS "" )
+
 ### Define changeable options ###
 
 set ( _DEBUG 0 CACHE BOOL "Create debug binary?" )
 set ( RUN_FROM_SOURCE 0 CACHE BOOL "Allow ZNC to be run without make install?" )
 set ( CSOCK_USE_POLL 1 CACHE BOOL "Use poll() instead of select()?" )
 set ( HAVE_IPV6 1 CACHE BOOL "Enable IPv6 support?" )
-set ( OPTIMIZE 1 CACHE BOOL "Let compiler optimize?" )
 
 option ( ENABLE_EXTRA "Enable some extra modules" )
 
@@ -52,6 +54,8 @@ if ( PKG_CONFIG_FOUND )
 		set ( HAVE_C_ARES 1 )
 		include_directories ( ${CARES_INCLUDE_DIRS} )
 		link_directories ( ${CARES_LIBRARY_DIRS} )
+		set ( ZNC_COMPILE_FLAGS "${ZNC_COMPILE_FLAGS} ${CARES_CFLAGS}" )
+		set ( ZNC_LINK_FLAGS "${ZNC_LINK_FLAGS} ${CARES_LDFLAGS}" )
 	endif ()
 endif ()
 
@@ -99,16 +103,12 @@ add_executable ( znc ${CORE_SRC_FILES} )
 
 target_link_libraries ( znc ${OPENSSL_LIBRARIES} ${CARES_LIBRARIES} ${CMAKE_DL_LIBS} )
 
-if ( CARES_FOUND )
-	set_target_properties ( znc PROPERTIES COMPILE_FLAGS "${CARES_CFLAGS}" LINK_FLAGS "${CARES_LDFLAGS}" )
-endif ()
-
 ### Compiler setup ###
 
 add_definitions ( -D_FORTIFY_SOURCE=2 )
 
 if ( CMAKE_COMPILER_IS_GNUCXX )
-	set_target_properties ( znc PROPERTIES COMPILE_FLAGS "-Wall -W -Wno-unused-parameter -Woverloaded-virtual -Wshadow" )
+	set ( ZNC_COMPILE_FLAGS "${ZNC_COMPILE_FLAGS} -Wall -W -Wno-unused-parameter -Woverloaded-virtual -Wshadow" )
 endif ()
 
 ### Configure debug build ###
@@ -116,6 +116,10 @@ endif ()
 if ( _DEBUG )
 	add_definitions ( -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -D_GLIBCXX_CONCEPT_CHECKS )
 endif ( _DEBUG)
+
+### Final steps ###
+
+set_target_properties ( znc PROPERTIES COMPILE_FLAGS "${ZNC_COMPILE_FLAGS}" LINK_FLAGS "${ZNC_LINK_FLAGS}" )
 
 ### Modules, anyone? ###
 

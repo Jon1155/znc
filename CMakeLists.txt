@@ -5,6 +5,8 @@ cmake_minimum_required ( VERSION 2.6 FATAL_ERROR )
 
 project ( ZNC )
 
+find_package ( PkgConfig )
+
 ### Define changeable options ###
 
 set ( _DEBUG 0 CACHE BOOL "Create debug binary?" )
@@ -15,15 +17,46 @@ set ( OPTIMIZE 1 CACHE BOOL "Let compiler optimize?" )
 
 option ( ENABLE_EXTRA "Enable some extra modules" )
 
+### Look for basic functions ###
+
+include ( CheckSymbolExists )
+
+check_symbol_exists ( lstat sys/stat.h HAVE_LSTAT )
+if ( NOT HAVE_LSTAT )
+	message ( FATAL_ERROR "Missing lstat() function." )
+endif ()
+
+check_symbol_exists ( getopt_long getopt.h HAVE_GETOPT_LONG )
+if ( NOT HAVE_GETOPT_LONG )
+	message ( FATAL_ERROR "Missing getopt_long() function." )
+endif ()
+
+set ( CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${CMAKE_DL_LIBS} )
+check_symbol_exists ( dlopen dlfcn.h HAVE_DLOPEN )
+if ( NOT HAVE_DLOPEN )
+	message ( FATAL_ERROR "Missing dlopen() function." )
+endif ()
+
 ### Look for OpenSSL ###
 
-include ( FindOpenSSL )
+find_package ( OpenSSL )
 
 if ( OPENSSL_FOUND )
 	include_directories ( ${OPENSSL_INCLUDE_DIR} )
 	# for zncconfig.h
 	set ( HAVE_LIBSSL 1 )
 endif ( OPENSSL_FOUND )
+
+### Look for c-ares ###
+
+if ( PKG_CONFIG_FOUND )
+	pkg_check_modules ( CARES libcares>=1.5.0 )
+	if ( CARES_FOUND )
+		set ( HAVE_C_ARES 1 )
+		include_directories ( ${CARES_INCLUDE_DIRS} )
+		link_directories ( ${CARES_LIBRARY_DIRS} )
+	endif ()
+endif ()
 
 ### Create zncconfig.h ###
 
@@ -33,16 +66,6 @@ configure_file (
 )
 
 include_directories ( ${ZNC_BINARY_DIR} )
-
-### Basic compiler setup ###
-
-add_definitions ( -D_FORTIFY_SOURCE=2 )
-
-### Configure debug build ###
-
-if ( _DEBUG )
-	add_definitions ( -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -D_GLIBCXX_CONCEPT_CHECKS )
-endif ( _DEBUG)
 
 ### Collect core files ###
 
@@ -73,10 +96,29 @@ set ( CORE_SRC_FILES
 	User.cpp
 )
 
-### Make main binary ###
+### Define main binary ###
 
-ADD_EXECUTABLE ( znc ${CORE_SRC_FILES} )
-TARGET_LINK_LIBRARIES ( znc ${OPENSSL_LIBRARIES} )
+add_executable ( znc ${CORE_SRC_FILES} )
+
+target_link_libraries ( znc ${OPENSSL_LIBRARIES} ${CARES_LIBRARIES} ${CMAKE_DL_LIBS} )
+
+if ( CARES_FOUND )
+	set_target_properties ( znc PROPERTIES COMPILE_FLAGS "${CARES_CFLAGS}" LINK_FLAGS "${CARES_LDFLAGS}" )
+endif ()
+
+### Compiler setup ###
+
+add_definitions ( -D_FORTIFY_SOURCE=2 )
+
+if ( CMAKE_COMPILER_IS_GNUCXX )
+	set_target_properties ( znc PROPERTIES COMPILE_FLAGS "-Wall -W -Wno-unused-parameter -Woverloaded-virtual -Wshadow" )
+endif ()
+
+### Configure debug build ###
+
+if ( _DEBUG )
+	add_definitions ( -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -D_GLIBCXX_CONCEPT_CHECKS )
+endif ( _DEBUG)
 
 ### Modules, anyone? ###
 
@@ -90,5 +132,6 @@ message ( STATUS "  Prefix:   ${CMAKE_INSTALL_PREFIX}" )
 message ( STATUS "  Debug:    ${_DEBUG}" )
 message ( STATUS "  IPv6:     ${HAVE_IPV6}" )
 message ( STATUS "  OpenSSL:  ${HAVE_LIBSSL}" )
+message ( STATUS "  c-ares:   ${HAVE_C_ARES}" )
 message ( STATUS "  From src: ${RUN_FROM_SOURCE}" )
 message ( STATUS "" )

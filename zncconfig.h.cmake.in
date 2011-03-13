@@ -1,0 +1,15 @@
+#ifndef ZNCCONFIG_H
+#define ZNCCONFIG_H
+
+#cmakedefine _DEBUG
+#cmakedefine RUN_FROM_SOURCE
+
+#cmakedefine HAVE_IPV6
+#cmakedefine HAVE_LIBSSL
+#cmakedefine HAVE_C_ARES
+#cmakedefine CSOCK_USE_POLL
+
+#define _DATADIR_ "@CMAKE_INSTALL_PREFIX@/share/znc"
+#define _MODDIR_ "@CMAKE_INSTALL_PREFIX@/lib/znc"
+
+#endif /* ZNCCONFIG_H */

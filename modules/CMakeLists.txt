@@ -3,8 +3,9 @@ include_directories ( ${ZNC_SOURCE_DIR} )
 
 set ( DISABLED_MODULES modpython modtcl charset modperl saslauth )
 
-macro ( znc_build_modules FOLDER )
+function ( znc_build_modules FOLDER )
 	file ( GLOB MODULE_FILES "${FOLDER}/*.cpp" )
+	list ( SORT MODULE_FILES )
 
 	foreach ( MODULE_FILE ${MODULE_FILES} )
 		string ( REGEX REPLACE "^.+/([^/]+)\\.cpp$" "\\1" MODULE_NAME ${MODULE_FILE} )
@@ -15,7 +16,7 @@ macro ( znc_build_modules FOLDER )
 			add_library ( ${MODULE_NAME} MODULE ${MODULE_FILE} )
 		endif ()
 	endforeach ()
-endmacro ()
+endfunction ()
 
 znc_build_modules ( "${ZNC_SOURCE_DIR}/modules" )
 

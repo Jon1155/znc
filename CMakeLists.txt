@@ -18,6 +18,7 @@ set ( CSOCK_USE_POLL 1 CACHE BOOL "Use poll() instead of select()?" )
 set ( HAVE_IPV6 1 CACHE BOOL "Enable IPv6 support?" )
 
 option ( ENABLE_EXTRA "Enable some extra modules" )
+option ( ENABLE_MODTCL "Enable modtcl (also requires ENABLE_EXTRA)" )
 
 ### Look for basic functions ###
 
@@ -135,6 +136,9 @@ message ( STATUS "  IPv6:     ${HAVE_IPV6}" )
 message ( STATUS "  OpenSSL:  ${HAVE_LIBSSL}" )
 message ( STATUS "  c-ares:   ${HAVE_C_ARES}" )
 message ( STATUS "  Extra:    ${ENABLE_EXTRA}" )
+if ( ENABLE_EXTRA )
+message ( STATUS "  modtcl:   ${ENABLE_MODTCL}" )
+endif ()
 message ( STATUS "  From src: ${RUN_FROM_SOURCE}" )
 message ( STATUS "" )
 

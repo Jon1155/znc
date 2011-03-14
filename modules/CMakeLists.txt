@@ -32,7 +32,7 @@ znc_build_modules ( "${ZNC_SOURCE_DIR}/modules" )
 if ( ENABLE_EXTRA )
 
 	### find (lib)iconv ###
-	include ( "${ZNC_SOURCE_DIR}/modules/FindIconv.cmake" )	
+	find_package (Iconv)
 	if ( NOT ICONV_FOUND )
 		list ( APPEND DISABLED_MODULES charset )
 		message ( STATUS "iconv not found, disabling charset module." )

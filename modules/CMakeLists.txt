@@ -27,6 +27,7 @@ if ( ENABLE_EXTRA )
 	include ( "${ZNC_SOURCE_DIR}/modules/FindIconv.cmake" )	
 	if ( NOT ICONV_FOUND )
 		list ( APPEND DISABLED_MODULES charset )
+		message ( STATUS "iconv not found, disabling charset module." )
 	endif ()
 
 	### find & configure extra modules ###

@@ -134,5 +134,7 @@ message ( STATUS "  Debug:    ${_DEBUG}" )
 message ( STATUS "  IPv6:     ${HAVE_IPV6}" )
 message ( STATUS "  OpenSSL:  ${HAVE_LIBSSL}" )
 message ( STATUS "  c-ares:   ${HAVE_C_ARES}" )
+message ( STATUS "  Extra:    ${ENABLE_EXTRA}" )
 message ( STATUS "  From src: ${RUN_FROM_SOURCE}" )
 message ( STATUS "" )
+

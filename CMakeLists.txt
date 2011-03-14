@@ -3,6 +3,16 @@
 
 cmake_minimum_required ( VERSION 2.6 FATAL_ERROR )
 
+if ( DEFINED CMAKE_BUILD_TYPE )
+	set ( CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the
+	type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS
+	used) Debug Release RelWithDebInfo MinSizeRel." )
+else ()
+	set ( CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of
+	build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used)
+	Debug Release RelWithDebInfo MinSizeRel." )
+endif ()
+
 project ( ZNC )
 
 find_package ( PkgConfig )
@@ -12,13 +22,18 @@ set ( ZNC_LINK_FLAGS "" )
 
 ### Define changeable options ###
 
-set ( _DEBUG 0 CACHE BOOL "Create debug binary?" )
 set ( RUN_FROM_SOURCE 0 CACHE BOOL "Allow ZNC to be run without make install?" )
 set ( CSOCK_USE_POLL 1 CACHE BOOL "Use poll() instead of select()?" )
 set ( HAVE_IPV6 1 CACHE BOOL "Enable IPv6 support?" )
 
 option ( ENABLE_EXTRA "Enable some extra modules" )
 option ( ENABLE_MODTCL "Enable modtcl (also requires ENABLE_EXTRA)" )
+
+if ( CMAKE_BUILD_TYPE STREQUAL "Debug" )
+	set ( _DEBUG 1 )
+elseif ()
+	set ( _DEBUG 0 )
+endif ()
 
 ### Look for basic functions ###
 
@@ -31,11 +46,15 @@ if ( NOT HAVE_GETOPT_LONG )
 	message ( FATAL_ERROR "Missing getopt_long() function." )
 endif ()
 
-set ( CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${CMAKE_DL_LIBS} )
-check_symbol_exists ( dlopen dlfcn.h HAVE_DLOPEN )
-if ( NOT HAVE_DLOPEN )
-	message ( FATAL_ERROR "Missing dlopen() function." )
-endif ()
+function ( look_for_dl )
+# scope CMAKE_REQUIRED_LIBRARIES.
+	set ( CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${CMAKE_DL_LIBS} )
+	check_symbol_exists ( dlopen dlfcn.h HAVE_DLOPEN )
+	if ( NOT HAVE_DLOPEN )
+		message ( FATAL_ERROR "Missing dlopen() function." )
+	endif ()
+endfunction ()
+look_for_dl ()
 
 ### Look for OpenSSL ###
 
@@ -73,29 +92,29 @@ include_directories ( ${ZNC_BINARY_DIR} )
 
 set ( CORE_SRC_FILES
 	Buffer.cpp
-	DCCBounce.cpp
-	Listener.cpp
-	Server.cpp
-	Utils.cpp
 	Chan.cpp
-	DCCSock.cpp
-	main.cpp
-	SHA256.cpp
-	WebModules.cpp
 	ClientCommand.cpp
-	FileUtils.cpp
-	MD5.cpp
-	Socket.cpp
-	znc.cpp
 	Client.cpp
-	HTTPSock.cpp
-	Modules.cpp
-	Template.cpp
-	ZNCString.cpp
 	Csocket.cpp
+	DCCBounce.cpp
+	DCCSock.cpp
+	FileUtils.cpp
+	HTTPSock.cpp
 	IRCSock.cpp
+	Listener.cpp
+	main.cpp
+	MD5.cpp
+	Modules.cpp
 	Nick.cpp
+	Server.cpp
+	SHA256.cpp
+	Socket.cpp
+	Template.cpp
 	User.cpp
+	Utils.cpp
+	WebModules.cpp
+	znc.cpp
+	ZNCString.cpp
 )
 
 ### Define main binary ###
@@ -131,7 +150,7 @@ add_subdirectory ( modules )
 message ( STATUS "" )
 message ( STATUS "ZNC configured:" )
 message ( STATUS "  Prefix:   ${CMAKE_INSTALL_PREFIX}" )
-message ( STATUS "  Debug:    ${_DEBUG}" )
+message ( STATUS "  Build:    ${CMAKE_BUILD_TYPE}" )
 message ( STATUS "  IPv6:     ${HAVE_IPV6}" )
 message ( STATUS "  OpenSSL:  ${HAVE_LIBSSL}" )
 message ( STATUS "  c-ares:   ${HAVE_C_ARES}" )
@@ -141,4 +160,16 @@ message ( STATUS "  modtcl:   ${ENABLE_MODTCL}" )
 endif ()
 message ( STATUS "  From src: ${RUN_FROM_SOURCE}" )
 message ( STATUS "" )
+
+### Installation information ###
+
+# also read modules/CMakeLists.txt
+install ( PROGRAMS ${ZNC_BINARY_DIR}/znc DESTINATION bin )
+install ( DIRECTORY ${ZNC_SOURCE_DIR}/webskins DESTINATION share/znc/webskins )
+file ( GLOB ZNC_HEADER_FILES ${ZNC_SOURCE_DIR}/ "*.h" )
+install ( FILES ${ZNC_HEADER_FILES} DESTINATION include/znc )
+
+### Allow building packages ###
+
+include ( CPack )
 

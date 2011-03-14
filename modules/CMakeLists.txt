@@ -4,6 +4,8 @@ include_directories ( ${ZNC_SOURCE_DIR} )
 set ( DISABLED_MODULES modpython modperl saslauth )
 
 function ( znc_build_modules FOLDER )
+	message ( STATUS "Scanning ${FOLDER}..." )
+
 	file ( GLOB MODULE_FILES "${FOLDER}/*.cpp" )
 	list ( SORT MODULE_FILES )
 
@@ -15,6 +17,12 @@ function ( znc_build_modules FOLDER )
 			message ( STATUS "Enabling module: ${MODULE_NAME}" )
 			add_library ( ${MODULE_NAME} MODULE ${MODULE_FILE} )
 			set_target_properties ( ${MODULE_NAME} PROPERTIES PREFIX "" )
+			set_target_properties ( ${MODULE_NAME} PROPERTIES COMPILE_FLAGS ${ZNC_COMPILE_FLAGS} )
+
+			install ( TARGETS ${MODULE_NAME} LIBRARY DESTINATION lib/znc )
+			if ( EXISTS "${FOLDER}/${MODULE_NAME}" AND IS_DIRECTORY "${FOLDER}/${MODULE_NAME}" )
+				install ( DIRECTORY "${FOLDER}/${MODULE_NAME}" DESTINATION "share/znc" )
+			endif ()
 		endif ()
 	endforeach ()
 endfunction ()

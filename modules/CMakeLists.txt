@@ -27,7 +27,27 @@ function ( znc_build_modules FOLDER )
 	endforeach ()
 endfunction ()
 
+### find tcl ###
+if ( ENABLE_MODTCL )
+	# suppress TK not found messages:
+	set ( TCL_FIND_QUIETLY 1 )
+	find_package ( TCL 8.4 )
+
+	if ( NOT TCL_FOUND )
+		message ( FATAL_ERROR "Modtcl has been enabled, but TCL doesn't seem to be installed!" )
+	endif ()
+else ()
+	list ( APPEND DISABLED_MODULES modtcl )
+endif ()
+
+### Configure core/main modules ###
 znc_build_modules ( "${ZNC_SOURCE_DIR}/modules" )
+
+### extra options for module "modtcl" ###
+if ( ENABLE_MODTCL AND TCL_FOUND )
+	target_link_libraries ( "modtcl" ${TCL_LIBRARY} )
+	set_target_properties ( "modtcl" PROPERTIES COMPILE_FLAGS "-I${TCL_INCLUDE_PATH}" )
+endif ()
 
 if ( ENABLE_EXTRA )
 
@@ -36,19 +56,6 @@ if ( ENABLE_EXTRA )
 	if ( NOT ICONV_FOUND )
 		list ( APPEND DISABLED_MODULES charset )
 		message ( STATUS "iconv not found, disabling charset module." )
-	endif ()
-
-	### find tcl ###
-	if ( ENABLE_MODTCL )
-		# suppress TK not found messages:
-		set ( TCL_FIND_QUIETLY 1 )
-		find_package ( TCL 8.4 )
-
-		if ( NOT TCL_FOUND )
-			message ( FATAL_ERROR "Modtcl has been enabled, but TCL doesn't seem to be installed!" )
-		endif ()
-	else ()
-		list ( APPEND DISABLED_MODULES modtcl )
 	endif ()
 
 	### find & configure extra modules ###
@@ -71,10 +78,4 @@ if ( ENABLE_EXTRA )
 		endif ()
 	endif ()
 
-	### extra options for module "modtcl" ###
-	if ( ENABLE_MODTCL AND TCL_FOUND )
-		target_link_libraries ( "modtcl" ${TCL_LIBRARY} )
-		set_target_properties ( "modtcl" PROPERTIES COMPILE_FLAGS "-I${TCL_INCLUDE_PATH}" )
-	endif ()
 endif ()
-

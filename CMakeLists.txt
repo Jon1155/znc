@@ -27,7 +27,7 @@ set ( CSOCK_USE_POLL 1 CACHE BOOL "Use poll() instead of select()?" )
 set ( HAVE_IPV6 1 CACHE BOOL "Enable IPv6 support?" )
 
 option ( ENABLE_EXTRA "Enable some extra modules" )
-option ( ENABLE_MODTCL "Enable modtcl (also requires ENABLE_EXTRA)" )
+option ( ENABLE_MODTCL "Enable modtcl" )
 
 if ( CMAKE_BUILD_TYPE STREQUAL "Debug" )
 	set ( _DEBUG 1 )

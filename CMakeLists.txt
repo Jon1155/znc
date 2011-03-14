@@ -15,6 +15,7 @@ endif ()
 
 project ( ZNC )
 
+set ( CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${ZNC_SOURCE_DIR}/cmake" )
 find_package ( PkgConfig )
 
 set ( ZNC_COMPILE_FLAGS "" )

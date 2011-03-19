@@ -1,7 +1,15 @@
 
 include_directories ( ${ZNC_SOURCE_DIR} )
 
-set ( DISABLED_MODULES modpython modperl saslauth )
+set ( DISABLED_MODULES saslauth )
+
+if (NOT ENABLE_MODPERL)
+	list (APPEND DISABLED_MODULES modperl)
+endif ()
+
+if (NOT ENABLE_MODPYTHON)
+	list (APPEND DISABLED_MODULES modpython)
+endif ()
 
 function ( znc_build_modules FOLDER )
 	message ( STATUS "Scanning ${FOLDER}..." )
@@ -79,3 +87,30 @@ if ( ENABLE_EXTRA )
 	endif ()
 
 endif ()
+
+if (ENABLE_MODPERL OR ENABLE_MODPYTHON)
+	find_package (SWIG)
+	if (NOT SWIG_FOUND)
+		message (FATAL_ERROR "SWIG is required for modperl and modpython")
+	endif ()
+	message (STATUS "Found SWIG: ${SWIG_EXECUTABLE}")
+	include (UseSWIG)
+	find_package (Perl REQUIRED)
+	execute_process (COMMAND "${PERL_EXECUTABLE}" -e "use 5.010; print 'success'" OUTPUT_VARIABLE CHECKPERL_VERSION)
+	execute_process (COMMAND "${PERL_EXECUTABLE}" -V::version: OUTPUT_VARIABLE PERL_REALVERSIONQUOTED)
+	string (REGEX REPLACE "'(.*)'" "\\1" PERL_REALVERSION "${PERL_REALVERSIONQUOTED}")
+	if (CHECKPERL_VERSION STREQUAL "success")
+		message (STATUS "Perl version: ${PERL_REALVERSION}")
+	else ()
+		message (FATAL_ERROR "Found perl ${PERL_REALVERSION} but at least 5.10 is required.")
+	endif ()
+endif ()
+
+if (ENABLE_MODPERL)
+	add_subdirectory (modperl)
+endif ()
+
+if (ENABLE_MODPYTHON)
+	add_subdirectory (modpython)
+endif ()
+

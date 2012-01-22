@@ -1118,3 +1118,178 @@ bool CUser::KeepBuffer() const { return m_bKeepBuffer; }
 CString CUser::GetSkinName() const { return m_sSkinName; }
 const CString& CUser::GetUserPath() const { if (!CFile::Exists(m_sUserPath)) { CDir::MakeDir(m_sUserPath); } return m_sUserPath; }
 // !Getters
+
+ticpp::Element CUser::LegacyConfigToXML(CConfig& Config, const CString& sUserName) {
+	ticpp::Element result("User");
+	result.SetAttribute("name", sUserName);
+	Config.StringVectorToXML("Nick", result);
+	Config.StringVectorToXML("AltNick", result);
+	Config.StringVectorToXML("QuitMsg", result);
+	Config.StringVectorToXML("Ident", result);
+	Config.StringVectorToXML("RealName", result);
+	Config.StringVectorToXML("chanmodes", result, "DefaultChanModes");
+	Config.StringVectorToXML("vhost", result, "BindHost");
+	Config.StringVectorToXML("BindHost", result);
+	Config.StringVectorToXML("dccvhost", result, "DCCBindHost");
+	Config.StringVectorToXML("DCCBindHost", result);
+	Config.StringVectorToXML("TimestampFormat", result);
+	Config.StringVectorToXML("Skin", result);
+	Config.StringVectorToXML("JoinTries", result);
+	Config.StringVectorToXML("MaxJoins", result);
+	Config.BoolVectorToXML("KeepBuffer", result);
+	Config.BoolVectorToXML("MultiClients", result);
+	Config.BoolVectorToXML("DenyLoadMod", result);
+	Config.BoolVectorToXML("Admin", result);
+	Config.BoolVectorToXML("denysetvhost", result, "DenySetBindHost");
+	Config.BoolVectorToXML("DenySetBindHost", result);
+	Config.BoolVectorToXML("AppendTimestamp", result);
+	Config.BoolVectorToXML("PrependTimestamp", result);
+	Config.StringVectorToXML("allow", result, "AllowHost");
+	Config.StringVectorToXML("CTCPReply", result);
+	Config.StringVectorToXML("DCCLookupMethod", result);
+	Config.BoolVectorToXML("BounceDCCs", result);
+	Config.StringVectorToXML("buffer", result, "DefaultBuffer");
+	Config.StringVectorToXML("StatusPrefix", result);
+	Config.StringVectorToXML("TimezoneOffset", result);
+	Config.StringVectorToXML("Timestamp", result);
+
+	ticpp::Element elPass("Password");
+	// There are different formats for this available:
+	// Pass = <plain text>
+	// Pass = <md5 hash> -
+	// Pass = plain#<plain text>
+	// Pass = <hash name>#<hash>
+	// Pass = <hash name>#<salted hash>#<salt>#
+	// 'Salted hash' means hash of 'password' + 'salt'
+	// Possible hashes are md5 and sha256
+	CString sPassword;
+	Config.FindStringEntry("pass", sPassword);
+	if (sPassword.Right(1) == "-") {
+		sPassword.RightChomp();
+		sPassword.Trim();
+		elPass.SetAttribute("Method", "MD5");
+		elPass.SetAttribute("Hash", sPassword);
+	} else {
+		CString sMethod = sPassword.Token(0, false, "#");
+		CString sPass = sPassword.Token(1, true, "#");
+		if (sMethod == "md5" || sMethod == "sha256") {
+			if (sMethod == "sha256") {
+				sMethod = "SHA256";
+			} else {
+				sMethod = "MD5";
+			}
+
+			CString sSalt = sPass.Token(1, false, "#");
+			sPass = sPass.Token(0, false, "#");
+			elPass.SetAttribute("Method", sMethod);
+			elPass.SetAttribute("Hash", sPass);
+			elPass.SetAttribute("Salt", sSalt);
+		} else if (sMethod == "plain") {
+			elPass.SetAttribute("Method", "Plain");
+			elPass.SetAttribute("Hash", sPass);
+		} else {
+			elPass.SetAttribute("Method", "Plain");
+			elPass.SetAttribute("Hash", sPassword);
+		}
+
+	}
+	CConfig::SubConfig subConf;
+	CConfig::SubConfig::const_iterator subIt;
+	Config.FindSubConfig("pass", subConf);
+	if (!sPassword.empty() && !subConf.empty()) {
+		CString sError = "Password defined more than once";
+		CUtils::PrintError(sError);
+//		return false;
+	}
+	subIt = subConf.begin();
+	if (subIt != subConf.end()) {
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		CString sHash;
+		CString sMethod;
+		CString sSalt;
+		pSubConf->FindStringEntry("hash", sHash);
+		pSubConf->FindStringEntry("method", sMethod);
+		pSubConf->FindStringEntry("salt", sSalt);
+		if (sMethod.empty() || sMethod.Equals("plain"))
+			sMethod = "Plain";
+		else if (sMethod.Equals("md5"))
+			sMethod = "MD5";
+		else if (sMethod.Equals("sha256"))
+			sMethod = "SHA256";
+		else {
+			CString sError = "Invalid hash method";
+			CUtils::PrintError(sError);
+//			return false;
+		}
+
+		elPass.SetAttribute("Method", sMethod);
+		elPass.SetAttribute("Hash", sHash);
+		elPass.SetAttribute("Salt", sSalt);
+		if (!pSubConf->empty()) {
+			CString sError = "Unhandled lines in config!";
+			CUtils::PrintError(sError);
+
+			CZNC::DumpConfig(pSubConf);
+//			return false;
+		}
+		subIt++;
+	}
+	if (subIt != subConf.end()) {
+		CString sError = "Password defined more than once";
+		CUtils::PrintError(sError);
+//		return false;
+	}
+	result.LinkEndChild(&elPass);
+
+	Config.FindSubConfig("network", subConf);
+	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
+		const CString& sNetworkName = subIt->first;
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		ticpp::Element elNetwork = CIRCNetwork::LegacyConfigToXML(*pSubConf, sNetworkName);
+
+		if (!pSubConf->empty()) {
+			CString sError = "Unhandled lines in config for Network [" + sUserName + "]!";
+			CUtils::PrintError(sError);
+
+			CZNC::DumpConfig(pSubConf);
+//			return false;
+		}
+
+		result.LinkEndChild(&elNetwork);
+	}
+
+	// pre-network stuff
+	VCString vsList;
+	Config.FindStringVector("server", vsList);
+	for (VCString::iterator i = vsList.begin(); i != vsList.end(); ++i) {
+		ticpp::Element elServer = CServer::LineConfigToXML(*i);
+		result.LinkEndChild(&elServer);
+	}
+
+	Config.FindSubConfig("chan", subConf);
+	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
+		const CString& sChanName = subIt->first;
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		ticpp::Element elChan = CChan::LegacyConfigToXML(*pSubConf, sChanName);
+		result.LinkEndChild(&elChan);
+	}
+
+	Config.FindStringVector("loadmodule", vsList);
+	for (VCString::iterator i = vsList.begin(); i != vsList.end(); ++i) {
+		CString sModName = i->Token(0);
+		CString sArgs = i->Token(1, true);
+
+		ticpp::Element elModule("Module");
+		elModule.SetAttribute("name", sModName);
+		elModule.SetAttribute("arguments", sArgs);
+		result.LinkEndChild(&elModule);
+	}
+
+	Config.BoolVectorToXML("IRCConnectEnabled", result);
+
+	return result;
+}
+
+
+
+

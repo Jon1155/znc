@@ -11,6 +11,7 @@
 
 #include <znc/zncconfig.h>
 #include <znc/ZNCString.h>
+#include <znc/XML.h>
 
 class CFile;
 class CConfig;
@@ -135,6 +136,27 @@ public:
 
 	bool Parse(CFile& file, CString& sErrorMsg);
 	void Write(CFile& file, unsigned int iIndentation = 0);
+
+	// Convert-to-XML helpers
+	void StringEntryToXMLAttr(const CString& sName, ticpp::Element& xml, const CString& sNewName);
+	void StringEntryToXMLAttr(const CString& sName, ticpp::Element& xml) {
+		StringEntryToXMLAttr(sName.AsLower(), xml, sName);
+	}
+
+	void BoolEntryToXMLAttr(const CString& sName, ticpp::Element& xml, const CString& sNewName);
+	void BoolEntryToXMLAttr(const CString& sName, ticpp::Element& xml) {
+		BoolEntryToXMLAttr(sName.AsLower(), xml, sName);
+	}
+
+	void StringVectorToXML(const CString& sName, ticpp::Element& xml, const CString& sNewName);
+	void StringVectorToXML(const CString& sName, ticpp::Element& xml) {
+		StringVectorToXML(sName.AsLower(), xml, sName);
+	}
+
+	void BoolVectorToXML(const CString& sName, ticpp::Element& xml, const CString& sNewName);
+	void BoolVectorToXML(const CString& sName, ticpp::Element& xml) {
+		BoolVectorToXML(sName.AsLower(), xml, sName);
+	}
 
 private:
 	EntryMap m_ConfigEntries;

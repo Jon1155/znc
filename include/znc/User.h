@@ -13,6 +13,7 @@
 #include <znc/Utils.h>
 #include <znc/Buffer.h>
 #include <znc/Nick.h>
+#include <znc/XML.h>
 #include <set>
 #include <vector>
 
@@ -167,6 +168,8 @@ public:
 	unsigned int MaxJoins() const { return m_uMaxJoins; }
 	CString GetSkinName() const;
 	// !Getters
+	
+	static ticpp::Element LegacyConfigToXML(CConfig& Config, const CString& sUserName);
 
 protected:
 	const CString         m_sUserName;

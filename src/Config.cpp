@@ -189,3 +189,39 @@ void CConfig::Write(CFile& File, unsigned int iIndentation) {
 		}
 	}
 }
+
+void CConfig::StringEntryToXMLAttr(const CString& sName, ticpp::Element& xml, const CString& sNewName) {
+	CString s;
+	if (FindStringEntry(sName, s)) {
+		xml.SetAttribute(sNewName, s);
+	}
+}
+
+void CConfig::BoolEntryToXMLAttr(const CString& sName, ticpp::Element& xml, const CString& sNewName) {
+	bool b;
+	if (FindBoolEntry(sName, b)) {
+		xml.SetAttribute(sNewName, b);
+	}
+}
+
+void CConfig::StringVectorToXML(const CString& sName, ticpp::Element& xml, const CString& sNewName) {
+	VCString vs;
+	if (FindStringVector(sName, vs)) {
+		for (VCString::iterator i = vs.begin(); i != vs.end(); ++i) {
+			ticpp::Element entry(sNewName);
+			entry.InsertEndChild(ticpp::Text(string(*i)));
+			xml.LinkEndChild(&entry);
+		}
+	}
+}
+
+void CConfig::BoolVectorToXML(const CString& sName, ticpp::Element& xml, const CString& sNewName) {
+	VCString vs;
+	if (FindStringVector(sName, vs)) {
+		for (VCString::iterator i = vs.begin(); i != vs.end(); ++i) {
+			ticpp::Element entry(sNewName);
+			entry.InsertEndChild(ticpp::Text(string(i->ToBool() ? "1" : "0")));
+			xml.LinkEndChild(&entry);
+		}
+	}
+}

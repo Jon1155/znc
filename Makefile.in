@@ -32,11 +32,12 @@ LIB_SRCS  := ZNCString.cpp Csocket.cpp znc.cpp IRCNetwork.cpp User.cpp IRCSock.c
 	Client.cpp Chan.cpp Nick.cpp Server.cpp Modules.cpp MD5.cpp Buffer.cpp Utils.cpp \
 	FileUtils.cpp HTTPSock.cpp Template.cpp ClientCommand.cpp Socket.cpp SHA256.cpp \
 	WebModules.cpp Listener.cpp Config.cpp ZNCDebug.cpp
+LIB_SRCS  += xml/ticpp.cpp xml/tinystr.cpp xml/tinyxml.cpp xml/tinyxmlerror.cpp xml/tinyxmlparser.cpp
 LIB_SRCS  := $(addprefix src/,$(LIB_SRCS))
 BIN_SRCS  := src/main.cpp
 LIB_OBJS  := $(patsubst %cpp,%o,$(LIB_SRCS))
 BIN_OBJS  := $(patsubst %cpp,%o,$(BIN_SRCS))
-CLEAN     := znc src/*.o core core.*
+CLEAN     := znc src/*.o src/xml/*.o core core.*
 DISTCLEAN := Makefile config.log config.status znc-config znc-buildmod .depend \
 	modules/.depend modules/Makefile man/Makefile znc.pc znc-uninstalled.pc
 
@@ -97,14 +98,20 @@ clean:
 distclean: clean
 	rm -rf $(DISTCLEAN)
 
+src/xml/%.o: src/xml/%.cpp Makefile
+	@mkdir -p .depend/xml src/xml
+	$(E) Building core object xml/$*...
+	$(Q)$(CXX) $(CXXFLAGS) -c -o $@ $< -MD -MF .depend/xml/$*.dep -Wno-overloaded-virtual
+
 src/%.o: src/%.cpp Makefile
-	@mkdir -p .depend src
+	@mkdir -p .depend/xml src/xml
 	$(E) Building core object $*...
-	$(Q)$(CXX) $(CXXFLAGS) -c -o $@ $< -MMD -MF .depend/$*.dep
+	$(Q)$(CXX) $(CXXFLAGS) -c -o $@ $< -MD -MF .depend/$*.dep
 
 install: znc $(LIBZNC)
 	test -d $(DESTDIR)$(bindir) || $(INSTALL) -d $(DESTDIR)$(bindir)
 	test -d $(DESTDIR)$(includedir)/znc || $(INSTALL) -d $(DESTDIR)$(includedir)/znc
+	test -d $(DESTDIR)$(includedir)/znc/xml || $(INSTALL) -d $(DESTDIR)$(includedir)/znc/xml
 	test -d $(DESTDIR)$(PKGCONFIGDIR) || $(INSTALL) -d $(DESTDIR)$(PKGCONFIGDIR)
 	test -d $(DESTDIR)$(MODDIR) || $(INSTALL) -d $(DESTDIR)$(MODDIR)
 	test -d $(DESTDIR)$(DATADIR) || $(INSTALL) -d $(DESTDIR)$(DATADIR)
@@ -115,6 +122,7 @@ install: znc $(LIBZNC)
 	$(INSTALL_SCRIPT) znc-config $(DESTDIR)$(bindir)
 	$(INSTALL_SCRIPT) znc-buildmod $(DESTDIR)$(bindir)
 	$(INSTALL_DATA) $(srcdir)/include/znc/*.h $(DESTDIR)$(includedir)/znc
+	$(INSTALL_DATA) $(srcdir)/include/znc/xml/*.h $(DESTDIR)$(includedir)/znc/xml
 	$(INSTALL_DATA) include/znc/zncconfig.h $(DESTDIR)$(includedir)/znc
 	$(INSTALL_DATA) znc.pc $(DESTDIR)$(PKGCONFIGDIR)
 	@$(MAKE) -C modules install DESTDIR=$(DESTDIR);
@@ -145,3 +153,4 @@ uninstall:
 	@echo "Successfully uninstalled, but empty directories were left behind"
 
 -include $(wildcard .depend/*.dep)
+-include $(wildcard .depend/xml/*.dep)

@@ -16,6 +16,7 @@
 #include <znc/Listener.h>
 #include <map>
 #include <list>
+#include <znc/xml/ticpp.h>
 
 using std::map;
 using std::list;
@@ -164,6 +165,7 @@ public:
 	// Never call this unless you are CConnectQueueTimer::~CConnectQueueTimer()
 	void LeakConnectQueueTimer(CConnectQueueTimer *pTimer);
 
+	static ticpp::Element LegacyConfigToXML(CConfig& Config);
 	static void DumpConfig(const CConfig* Config);
 
 private:

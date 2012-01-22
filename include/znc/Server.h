@@ -11,6 +11,7 @@
 
 #include <znc/zncconfig.h>
 #include <znc/ZNCString.h>
+#include <znc/XML.h>
 
 class CServer {
 public:
@@ -23,6 +24,7 @@ public:
 	bool IsSSL() const;
 	CString GetString(bool bIncludePassword = true) const;
 	static bool IsValidHostName(const CString& sHostName);
+	static ticpp::Element LineConfigToXML(CString sLine);
 private:
 protected:
 	CString         m_sName;

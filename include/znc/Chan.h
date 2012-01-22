@@ -13,6 +13,7 @@
 #include <znc/Nick.h>
 #include <znc/ZNCString.h>
 #include <znc/Buffer.h>
+#include <znc/XML.h>
 #include <map>
 #include <set>
 #include <vector>
@@ -144,6 +145,8 @@ public:
 	bool IsDisabled() const { return m_bDisabled; }
 	unsigned int GetJoinTries() const { return m_uJoinTries; }
 	// !Getters
+
+	static ticpp::Element LegacyConfigToXML(CConfig& Config, const CString& sName);
 private:
 protected:
 	bool                         m_bDetached;

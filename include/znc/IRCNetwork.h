@@ -139,6 +139,8 @@ public:
 
 	CString ExpandString(const CString& sStr) const;
 	CString& ExpandString(const CString& sStr, CString& sRet) const;
+
+	static ticpp::Element LegacyConfigToXML(CConfig& Config, const CString& sName);
 private:
 	bool JoinChan(CChan* pChan);
 	void JoinChans(set<CChan*>& sChans);

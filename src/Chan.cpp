@@ -559,3 +559,23 @@ void CChan::SendBuffer(CClient* pClient) {
 		}
 	}
 }
+
+ticpp::Element CChan::LegacyConfigToXML(CConfig& Config, const CString& sName) {
+	ticpp::Element result("Channel");
+	result.SetAttribute("name", sName);
+	Config.StringEntryToXMLAttr("Buffer", result);
+	Config.BoolEntryToXMLAttr("KeepBuffer", result);
+	Config.BoolEntryToXMLAttr("Detached", result);
+	Config.StringEntryToXMLAttr("Key", result);
+	Config.StringEntryToXMLAttr("Modes", result);
+	if (!Config.empty()) {
+		CString sError = "Unhandled lines in config for Channel [" + sName + "]!";
+		CUtils::PrintError(sError);
+
+		CZNC::DumpConfig(&Config);
+//		return false;
+	}
+	return result;
+}
+
+

@@ -1066,3 +1066,45 @@ CString& CIRCNetwork::ExpandString(const CString& sStr, CString& sRet) const {
 
 	return m_pUser->ExpandString(sRet, sRet);
 }
+
+ticpp::Element CIRCNetwork::LegacyConfigToXML(CConfig& Config, const CString& sName) {
+	ticpp::Element result("Network");
+	result.SetAttribute("name", sName);
+	Config.StringVectorToXML("Nick", result);
+	Config.StringVectorToXML("AltNick", result);
+	Config.StringVectorToXML("Ident", result);
+	Config.StringVectorToXML("RealName", result);
+	Config.BoolVectorToXML("IRCConnectEnabled", result);
+
+	VCString vsList;
+	Config.FindStringVector("loadmodule", vsList);
+	for (VCString::iterator i = vsList.begin(); i != vsList.end(); ++i) {
+		CString sModName = i->Token(0);
+		CString sArgs = i->Token(1, true);
+
+		ticpp::Element elModule("Module");
+		elModule.SetAttribute("name", sModName);
+		elModule.SetAttribute("arguments", sArgs);
+		result.LinkEndChild(&elModule);
+	}
+
+	Config.FindStringVector("server", vsList);
+	for (VCString::iterator i = vsList.begin(); i != vsList.end(); ++i) {
+		ticpp::Element elServer = CServer::LineConfigToXML(*i);
+		result.LinkEndChild(&elServer);
+	}
+
+	CConfig::SubConfig subConf;
+	CConfig::SubConfig::const_iterator subIt;
+	Config.FindSubConfig("chan", subConf);
+	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
+		const CString& sChanName = subIt->first;
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		ticpp::Element elChan = CChan::LegacyConfigToXML(*pSubConf, sChanName);
+		result.LinkEndChild(&elChan);
+	}
+
+	return result;
+}
+
+

@@ -15,6 +15,10 @@
 #include <znc/IRCNetwork.h>
 #include <znc/Listener.h>
 #include <znc/Config.h>
+#include <znc/XML.h>
+
+#include <fstream>
+using std::ifstream;
 
 static inline CString FormatBindError() {
 	CString sError = (errno == 0 ? CString("unknown error, check the host name") : CString(strerror(errno)));
@@ -341,7 +345,7 @@ CString CZNC::ExpandConfigPath(const CString& sConfigFile, bool bAllowMkDir) {
 	CString sRetPath;
 
 	if (sConfigFile.empty()) {
-		sRetPath = GetConfPath(bAllowMkDir) + "/znc.conf";
+		sRetPath = GetConfPath(bAllowMkDir) + "/znc.xml";
 	} else {
 		if (sConfigFile.Left(2) == "./" || sConfigFile.Left(3) == "../") {
 			sRetPath = GetCurPath() + "/" + sConfigFile;
@@ -960,6 +964,42 @@ bool CZNC::ParseConfig(const CString& sConfig)
 
 	m_sConfigFile = ExpandConfigPath(sConfig, false);
 
+	if (!CFile::Exists(m_sConfigFile)) {
+		CUtils::PrintMessage("File [" + m_sConfigFile + "] not found");
+		CFile File(CDir::ChangeDir(m_sConfigFile, "../znc.conf"));
+		if (!File.Exists()) {
+			CUtils::PrintMessage("Restart ZNC with the --makeconf option if you wish to create this config.");
+			return false;
+		}
+		CUtils::PrintAction("Found legacy znc.conf, converting it to znc.xml");
+
+		if (!File.Open()) {
+			CString sError = "Can not open config file";
+			CUtils::PrintError(sError);
+			return false;
+		}
+
+		CConfig config;
+		CString sError;
+		if (!config.Parse(File, sError)) {
+			CUtils::PrintStatus(false, sError);
+			return false;
+		}
+		CUtils::PrintStatus(true);
+//		ticpp::Document doc;
+//		doc.InsertEndChild(ticpp::Comment(string(MakeConfigHeader())));
+//		doc.InsertEndChild(ticpp::Comment(string("x-->x")));
+//		doc.InsertEndChild(LegacyConfigToXML(config));
+//		doc.SaveFile(m_sConfigFile);
+		DEBUG("ZXXZXZ");
+		try {
+		ticpp::Document doc2;
+		doc2.LoadFile(m_sConfigFile);
+		} catch (ticpp::Exception& e){
+			DEBUG("Catch: " << e.what());
+		}
+		DEBUG("DSTDRD");
+	}
 	return DoRehash(s);
 }
 
@@ -1031,6 +1071,17 @@ bool CZNC::DoRehash(CString& sError)
 	delete m_pLockFile;
 	m_pLockFile = pFile;
 	CFile &File = *pFile;
+
+	try {
+		DEBUG("XCCCCCAAAAAAA");
+		ticpp::Document config("cfg");
+		config.LoadFile(m_sConfigFile);
+		DEBUG("XCCCCCCCCCCCC");
+	} catch (ticpp::Exception& e) {
+		sError = e.what();
+		CUtils::PrintStatus(false, sError);
+		return false;
+	}
 
 	CConfig config;
 	if (!config.Parse(File, sError)) {
@@ -1330,6 +1381,140 @@ void CZNC::DumpConfig(const CConfig* pConfig) {
 			DumpConfig(it->second.m_pSubConfig);
 		}
 	}
+}
+
+ticpp::Element CZNC::LegacyConfigToXML(CConfig& Config) {
+	ticpp::Element result("Config");
+	VCString vsList;
+
+	Config.StringEntryToXMLAttr("version", result);
+	Config.StringVectorToXML("ISpoofFormat", result);
+	Config.StringVectorToXML("ISpoofFile", result);
+	Config.StringVectorToXML("MOTD", result);
+	Config.StringVectorToXML("BindHost", result);
+	Config.StringVectorToXML("vhost", result, "BindHost");
+	Config.StringVectorToXML("PidFile", result);
+	Config.StringVectorToXML("StatusPrefix", result);
+	Config.StringVectorToXML("SSLCertFile", result);
+	Config.StringVectorToXML("Skin", result);
+	Config.StringVectorToXML("ConnectDelay", result);
+	Config.StringVectorToXML("ServerThrottle", result);
+	Config.StringVectorToXML("AnonIPLimit", result);
+	Config.StringVectorToXML("MaxBufferSize", result);
+	Config.StringVectorToXML("ProtectWebSessions", result);
+
+	const char *szListenerEntries[] = {
+		"listen", "listen6", "listen4",
+		"listener", "listener6", "listener4"
+	};
+	const size_t numListenerEntries = sizeof(szListenerEntries) / sizeof(szListenerEntries[0]);
+
+	for (size_t i = 0; i < numListenerEntries; i++) {
+		Config.FindStringVector(szListenerEntries[i], vsList);
+
+		for (VCString::iterator it = vsList.begin(); it != vsList.end(); ++it) {
+			CString sName = szListenerEntries[i];
+			CString sValue = *it;
+
+			EAddrType eAddr = ADDR_ALL;
+			if (sName.Equals("Listen4") || sName.Equals("Listen") || sName.Equals("Listener4")) {
+				eAddr = ADDR_IPV4ONLY;
+			}
+			if (sName.Equals("Listener6")) {
+				eAddr = ADDR_IPV6ONLY;
+			}
+
+			CListener::EAcceptType eAccept = CListener::ACCEPT_ALL;
+			if (sValue.TrimPrefix("irc_only "))
+				eAccept = CListener::ACCEPT_IRC;
+			else if (sValue.TrimPrefix("web_only "))
+				eAccept = CListener::ACCEPT_HTTP;
+
+			bool bSSL = false;
+			CString sPort;
+			CString sBindHost;
+
+			if (ADDR_IPV4ONLY == eAddr) {
+				sValue.Replace(":", " ");
+			}
+
+			if (sValue.find(" ") != CString::npos) {
+				sBindHost = sValue.Token(0, false, " ");
+				sPort = sValue.Token(1, true, " ");
+			} else {
+				sPort = sValue;
+			}
+
+			if (sPort.Left(1) == "+") {
+				sPort.LeftChomp();
+				bSSL = true;
+			}
+
+			ticpp::Element elListener("Listener");
+			elListener.SetAttribute("Host", sBindHost);
+			elListener.SetAttribute("Port", sPort);
+			elListener.SetAttribute("SSL", bSSL);
+			elListener.SetAttribute("IPv4", eAddr != ADDR_IPV6ONLY);
+			elListener.SetAttribute("IPv6", eAddr != ADDR_IPV4ONLY);
+			elListener.SetAttribute("AllowIRC", eAccept != CListener::ACCEPT_HTTP);
+			elListener.SetAttribute("AllowWeb", eAccept != CListener::ACCEPT_IRC);
+			result.LinkEndChild(&elListener);
+		}
+	}
+
+	CConfig::SubConfig subConf;
+	CConfig::SubConfig::const_iterator subIt;
+
+	Config.FindSubConfig("listener", subConf);
+	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		ticpp::Element elListener("Listener");
+		pSubConf->StringEntryToXMLAttr("Host", elListener);
+		pSubConf->StringEntryToXMLAttr("Port", elListener);
+		pSubConf->BoolEntryToXMLAttr("SSL", elListener);
+		pSubConf->BoolEntryToXMLAttr("IPv4", elListener);
+		pSubConf->BoolEntryToXMLAttr("IPv6", elListener);
+		pSubConf->BoolEntryToXMLAttr("AllowIRC", elListener);
+		pSubConf->BoolEntryToXMLAttr("AllowWeb", elListener);
+
+		if (!pSubConf->empty()) {
+			CString sError = "Unhandled lines in Listener config!";
+			CUtils::PrintError(sError);
+
+			CZNC::DumpConfig(pSubConf);
+//			return false;
+		}
+		result.LinkEndChild(&elListener);
+	}
+
+	Config.FindStringVector("loadmodule", vsList);
+	for (VCString::iterator i = vsList.begin(); i != vsList.end(); ++i) {
+		CString sModName = i->Token(0);
+		CString sArgs = i->Token(1, true);
+
+		ticpp::Element elModule("Module");
+		elModule.SetAttribute("name", sModName);
+		elModule.SetAttribute("arguments", sArgs);
+		result.LinkEndChild(&elModule);
+	}
+
+	Config.FindSubConfig("user", subConf);
+	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
+		const CString& sUserName = subIt->first;
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		ticpp::Element elUser = CUser::LegacyConfigToXML(*pSubConf, sUserName);
+
+		if (!pSubConf->empty()) {
+			CString sError = "Unhandled lines in config for User [" + sUserName + "]!";
+			CUtils::PrintError(sError);
+
+			DumpConfig(pSubConf);
+//			return false;
+		}
+
+		result.LinkEndChild(&elUser);
+	}
+	return result;
 }
 
 void CZNC::ClearBindHosts() {

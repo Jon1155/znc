@@ -30,3 +30,25 @@ CString CServer::GetString(bool bIncludePassword) const {
 	return m_sName + " " + CString(m_bSSL ? "+" : "") + CString(m_uPort) +
 		CString(bIncludePassword ? (m_sPass.empty() ? "" : " " + m_sPass) : "");
 }
+
+ticpp::Element CServer::LineConfigToXML(CString sLine) {
+	bool bSSL = false;
+	sLine.Trim();
+
+	CString sHost = sLine.Token(0);
+	CString sPort = sLine.Token(1);
+
+	if (sPort.Left(1) == "+") {
+		bSSL = true;
+		sPort.LeftChomp();
+	}
+
+	CString sPass = sLine.Token(2, true);
+
+	ticpp::Element elServer("Server");
+	elServer.SetAttribute("Host", sHost);
+	elServer.SetAttribute("Port", sPort);
+	elServer.SetAttribute("SSL", bSSL);
+	elServer.SetAttribute("Password", sPass);
+	return elServer;
+}

@@ -1097,10 +1097,64 @@ bool CZNC::DoRehash(CString& sError)
 		m_vpListeners.erase(m_vpListeners.begin());
 	}
 
-	MCString msModules;          // Modules are queued for later loading
+	CString sVal;
+	if (config.FindStringEntry("pidfile", sVal))
+		m_sPidFile = sVal;
+	if (config.FindStringEntry("statusprefix", sVal))
+		m_sStatusPrefix = sVal;
+	if (config.FindStringEntry("sslcertfile", sVal))
+		m_sSSLCertFile = sVal;
+	if (config.FindStringEntry("skin", sVal))
+		SetSkinName(sVal);
+	if (config.FindStringEntry("connectdelay", sVal))
+		SetConnectDelay(sVal.ToUInt());
+	if (config.FindStringEntry("serverthrottle", sVal))
+		m_sConnectThrottle.SetTTL(sVal.ToUInt() * 1000);
+	if (config.FindStringEntry("anoniplimit", sVal))
+		m_uiAnonIPLimit = sVal.ToUInt();
+	if (config.FindStringEntry("maxbuffersize", sVal))
+		m_uiMaxBufferSize = sVal.ToUInt();
+	if (config.FindStringEntry("protectwebsessions", sVal))
+  		m_bProtectWebSessions = sVal.ToBool();
+
+	// This has to be after SSLCertFile is handled since it uses that value
+	const char *szListenerEntries[] = {
+		"listen", "listen6", "listen4",
+		"listener", "listener6", "listener4"
+	};
+	const size_t numListenerEntries = sizeof(szListenerEntries) / sizeof(szListenerEntries[0]);
 
 	VCString vsList;
 	VCString::const_iterator vit;
+	for (size_t i = 0; i < numListenerEntries; i++) {
+		config.FindStringVector(szListenerEntries[i], vsList);
+		vit = vsList.begin();
+
+		for (; vit != vsList.end(); ++vit) {
+			if (!AddListener(szListenerEntries[i] + CString(" ") + *vit, sError))
+				return false;
+		}
+	}
+
+	CConfig::SubConfig subConf;
+	CConfig::SubConfig::const_iterator subIt;
+
+	config.FindSubConfig("listener", subConf);
+	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
+		CConfig* pSubConf = subIt->second.m_pSubConfig;
+		if (!AddListener(pSubConf, sError))
+			return false;
+		if (!pSubConf->empty()) {
+			sError = "Unhandled lines in Listener config!";
+			CUtils::PrintError(sError);
+
+			CZNC::DumpConfig(pSubConf);
+			return false;
+		}
+	}
+
+	MCString msModules;          // Modules are queued for later loading
+
 	config.FindStringVector("loadmodule", vsList);
 	for (vit = vsList.begin(); vit != vsList.end(); ++vit) {
 		CString sModName = vit->Token(0);
@@ -1186,62 +1240,8 @@ bool CZNC::DoRehash(CString& sError)
 	for (vit = vsList.begin(); vit != vsList.end(); ++vit) {
 		AddBindHost(*vit);
 	}
-
-	CString sVal;
-	if (config.FindStringEntry("pidfile", sVal))
-		m_sPidFile = sVal;
-	if (config.FindStringEntry("statusprefix", sVal))
-		m_sStatusPrefix = sVal;
-	if (config.FindStringEntry("sslcertfile", sVal))
-		m_sSSLCertFile = sVal;
-	if (config.FindStringEntry("skin", sVal))
-		SetSkinName(sVal);
-	if (config.FindStringEntry("connectdelay", sVal))
-		SetConnectDelay(sVal.ToUInt());
-	if (config.FindStringEntry("serverthrottle", sVal))
-		m_sConnectThrottle.SetTTL(sVal.ToUInt() * 1000);
-	if (config.FindStringEntry("anoniplimit", sVal))
-		m_uiAnonIPLimit = sVal.ToUInt();
-	if (config.FindStringEntry("maxbuffersize", sVal))
-		m_uiMaxBufferSize = sVal.ToUInt();
-	if (config.FindStringEntry("protectwebsessions", sVal))
-  		m_bProtectWebSessions = sVal.ToBool();
-
-	// This has to be after SSLCertFile is handled since it uses that value
-	const char *szListenerEntries[] = {
-		"listen", "listen6", "listen4",
-		"listener", "listener6", "listener4"
-	};
-	const size_t numListenerEntries = sizeof(szListenerEntries) / sizeof(szListenerEntries[0]);
-
-	for (size_t i = 0; i < numListenerEntries; i++) {
-		config.FindStringVector(szListenerEntries[i], vsList);
-		vit = vsList.begin();
-
-		for (; vit != vsList.end(); ++vit) {
-			if (!AddListener(szListenerEntries[i] + CString(" ") + *vit, sError))
-				return false;
-		}
-	}
-
-	CConfig::SubConfig subConf;
-	CConfig::SubConfig::const_iterator subIt;
-
-	config.FindSubConfig("listener", subConf);
-	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
-		CConfig* pSubConf = subIt->second.m_pSubConfig;
-		if (!AddListener(pSubConf, sError))
-			return false;
-		if (!pSubConf->empty()) {
-			sError = "Unhandled lines in Listener config!";
-			CUtils::PrintError(sError);
-
-			CZNC::DumpConfig(pSubConf);
-			return false;
-		}
-	}
-
 	config.FindSubConfig("user", subConf);
+
 	for (subIt = subConf.begin(); subIt != subConf.end(); ++subIt) {
 		const CString& sUserName = subIt->first;
 		CConfig* pSubConf = subIt->second.m_pSubConfig;
